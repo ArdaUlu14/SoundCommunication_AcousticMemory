@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Radial Memory Matrix v32 — Vector Ecosystem & Fluid Audio</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/speech-commands@0.4.0/dist/speech-commands.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@200;300;400;600&family=Space+Mono&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{overflow:hidden;background:#05070A;font-family:'Josefin Sans',sans-serif;color:#e4e7eb; user-select:none;}
+
+/* ── ORACLE PANEL ── */
+#oracle{
+  position:fixed;top:0;left:0;bottom:0;width:300px;
+  background:rgba(5,7,10,.85);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border-right:.5px solid rgba(255,255,255,.05);
+  z-index:50;overflow-y:auto;font-size:11px;
+  transition:transform .4s cubic-bezier(.4,0,.2,1);
+}
+#oracle.hidden{transform:translateX(-300px)}
+#oracle::-webkit-scrollbar{width:2px}
+#oracle::-webkit-scrollbar-thumb{background:rgba(200,168,64,.2)}
+
+.o-head{display:flex;justify-content:space-between;align-items:center;padding:24px 20px 16px;border-bottom:.5px solid rgba(255,255,255,.05);}
+.o-head span{font-size:12px;letter-spacing:.2em;color:#c8a840;font-weight:300}
+.o-close{background:none;border:none;color:#8a92a6;cursor:pointer;font-size:14px}
+
+.o-section{padding:16px 20px;border-bottom:.5px solid rgba(255,255,255,.03)}
+.o-label{font-size:9px;letter-spacing:.2em;color:#5a6273;margin-bottom:12px;text-transform:uppercase}
+
+#cls-result{display:flex;flex-direction:column;gap:8px;}
+.cls-card{background:rgba(255,255,255,.01);border:.5px solid rgba(255,255,255,.03);padding:10px 12px;border-radius:2px; transition: opacity 0.3s;}
+.cls-name{font-size:10px;color:#a8b2c1;display:flex;justify-content:space-between;align-items:center;}
+.cls-bar-wrap{height:2px;background:rgba(255,255,255,.05);margin-top:8px;border-radius:1px;position:relative}
+.cls-bar{position:absolute;left:0;top:0;height:100%;transition:width 0.2s;box-shadow:0 0 8px currentColor}
+
+#panel-meter{height:40px;position:relative;margin-top:8px;display:flex;align-items:flex-end;gap:2px}
+.meter-bar{flex:1;background:rgba(200,168,64,.4);border-radius:1px;transition:height .08s}
+
+.o-info{font-size:11px;color:#8a92a6;line-height:2.2;font-family:'Space Mono',monospace}
+.o-info span{color:#5a6273;font-size:9px;letter-spacing:0.1em;font-family:'Josefin Sans',sans-serif}
+
+.btn-action{
+  width:100%;padding:10px;background:none;border:.5px solid rgba(255,255,255,0.1);
+  color:#8a92a6;font-size:9px;letter-spacing:0.15em;cursor:pointer;transition:0.3s;margin-top:8px;
+}
+.btn-action:hover{background:rgba(255,255,255,0.05);color:#e4e7eb}
+.btn-mix{border-color:rgba(200,168,64,0.3); color:#c8a840;}
+.btn-mix:hover{background:rgba(200,168,64,0.1);}
+.btn-finish{border-color:rgba(230,70,60,0.5); color:#e6463c;}
+.btn-finish:hover{background:rgba(230,70,60,0.15); border-color:#e6463c;}
+
+#archive-gallery{display:flex;flex-direction:column;gap:10px;margin-top:12px;}
+.snap-item{position:relative;}
+.snap-item img{width:100%;border:1px solid rgba(255,255,255,0.1);opacity:0.8;transition:0.3s;}
+.snap-item img:hover{opacity:1; border-color:#c8a840;}
+.snap-time{position:absolute;bottom:4px;right:6px;font-size:8px;color:#fff;background:rgba(0,0,0,0.6);padding:2px 4px;font-family:monospace;}
+
+#oracle-toggle{
+  position:fixed;top:30px;left:30px;
+  background:rgba(5,7,10,.8);border:1px solid rgba(255,255,255,0.1);color:#8a92a6;font-size:9px;
+  padding:10px 16px;cursor:pointer;z-index:51;letter-spacing:.2em;text-transform:uppercase;
+  transition:all .3s;border-radius:2px;
+}
+#oracle-toggle:hover{color:#c8a840; border-color:#c8a840}
+#oracle-toggle.shifted{left:320px}
+
+/* ── ZONE FOCUS PANEL ── */
+#zone-panel{
+  position:fixed;top:50%;right:20px;transform:translateY(-50%);
+  width:200px;background:rgba(5,7,10,.92);backdrop-filter:blur(12px);
+  border:.5px solid rgba(255,255,255,.06);padding:0;z-index:40;
+  display:none;font-family:'Space Mono',monospace;
+}
+#zone-panel.visible{display:block}
+.zp-head{display:flex;justify-content:space-between;align-items:center;padding:12px 14px 8px;border-bottom:.5px solid rgba(255,255,255,.04)}
+.zp-title{font-size:10px;letter-spacing:.16em;color:#d8d0b0}
+.zp-close{background:none;border:none;color:#3a4253;cursor:pointer;font-size:11px}
+.zp-body{padding:10px 14px 14px}
+.zp-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.zp-key{font-size:8px;letter-spacing:.1em;color:#3a4253;text-transform:uppercase}
+.zp-val{font-size:10.5px;color:#c8c0a0}
+.zp-bar-wrap{width:100%;height:2px;background:rgba(255,255,255,.05);border-radius:1px;margin:6px 0 10px;overflow:hidden}
+.zp-bar-fill{height:100%;border-radius:1px;transition:width .4s}
+.zp-timeline{display:flex;gap:2px;flex-wrap:wrap;margin-top:4px}
+.zp-dot{width:4px;height:4px;border-radius:50%;opacity:.7}
+
+#start-overlay{
+  position:fixed;inset:0;background:#05070A;z-index:100;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;
+}
+#start-overlay p.title{font-size:24px;color:#e4e7eb;letter-spacing:.15em;font-weight:300}
+#start-overlay p.sub{font-size:11px;color:#5a6273;letter-spacing:.1em;max-width:400px;text-align:center;line-height:1.6}
+#start-btn{
+  padding:14px 40px;font-size:11px;letter-spacing:.2em;
+  background:none;border:.5px solid rgba(255,255,255,0.2);color:#e4e7eb;
+  cursor:pointer;transition:all 0.3s;
+}
+#start-btn:hover{border-color:#c8a840;color:#c8a840;background:rgba(200,168,64,0.05)}
+</style>
+</head>
+<body>
+
+<div id="start-overlay">
+  <p class="title">RADIAL MEMORY MATRIX</p>
+  <p class="sub">Radial memory portrait of the acoustic environment. Analyzes live sounds, records them, and creates a cellular network.</p>
+  <button id="start-btn" onclick="startSystem()">START SYSTEM</button>
+  <p id="loading-text" class="sub" style="margin-top:-10px;display:none">Loading AI model...</p>
+</div>
+
+<div id="oracle" class="hidden">
+  <div class="o-head">
+    <span>SOUND ORACLE</span>
+    <button class="o-close" onclick="toggleOracle()">✕</button>
+  </div>
+  <div class="o-section">
+    <div class="o-label">LIVE MODEL DISTRIBUTION</div>
+    <div id="cls-result"></div>
+  </div>
+  <div class="o-section">
+    <div class="o-label">ACOUSTIC AMPLITUDE & STRESS LOAD</div>
+    <div id="panel-meter"></div>
+    <div id="panel-meter-val" style="font-size:10px;color:#e4e7eb;margin-top:8px;font-family:monospace">—</div>
+  </div>
+  <div class="o-section">
+    <div class="o-label">DATABASE STATUS</div>
+    <div id="panel-state" class="o-info">
+      <span>AI PREDICTION:</span> —<br>
+      <span>CATEGORY:</span> —<br>
+      <span>ACTIVE AGENTS:</span> 0
+    </div>
+  </div>
+  <div class="o-section">
+    <div class="o-label">ACOUSTIC ARCHIVE (SPACE / S)</div>
+    <div id="archive-gallery"></div>
+  </div>
+  <div class="o-section" style="border:none">
+    <button class="btn-action btn-mix" onclick="toggleMixMode()">MIX SYSTEM</button>
+    <button class="btn-action" onclick="clearMemory()">CLEAR MEMORY</button>
+    <button class="btn-action btn-finish" onclick="finishSession()">FINISH SESSION</button>
+  </div>
+</div>
+
+<button id="oracle-toggle" onclick="toggleOracle()">ORACLE INTERFACE</button>
+
+<div id="zone-panel">
+  <div class="zp-head"><span class="zp-title" id="zp-title">—</span><button class="zp-close" onclick="exitFocus()">✕</button></div>
+  <div class="zp-body">
+    <div class="zp-row"><span class="zp-key">Active Agent</span><span class="zp-val" id="zp-count">0</span></div>
+    <div class="zp-row"><span class="zp-key">Avg. Confidence</span><span class="zp-val" id="zp-conf">—</span></div>
+    <div class="zp-row"><span class="zp-key">First Detected</span><span class="zp-val" id="zp-first">—</span></div>
+    <div class="zp-row"><span class="zp-key">Last Detected</span><span class="zp-val" id="zp-last">—</span></div>
+    <div class="zp-bar-wrap"><div class="zp-bar-fill" id="zp-bar"></div></div>
+    <div class="zp-key" style="margin-bottom:5px">Activity History</div>
+    <div class="zp-timeline" id="zp-timeline"></div>
+  </div>
+</div>
+
+<script>
+// TeachableMachine - Yeni Model URL'i
+const TM_URL = "https://teachablemachine.withgoogle.com/models/cDGBVdbat/"; 
+const MAX_PER_CLASS = 150; 
+
+let recognizer, tmLabels = [], tmScores = [];
+let currentAIClass = "Waiting...", currentAIScore = 0;
+let audioCtx, analyser, freqData, micStarted = false;
+let oracleOpen = false;
+
+let bassVol = 0, midVol = 0, trebleVol = 0;
+let isMixing = false; 
+let isSessionFinished = false; 
+let draggedAgent = null; 
+let harmonyMasterGain = null; 
+
+let focusedZoneIdx = null; 
+let ZONE_STATS = {};
+
+// ── SES HAFIZASI (1.5 Saniye) ──
+const SAMPLE_RATE = 44100;
+const RECORD_DUR = 1.5;
+const BUFFER_SIZE = Math.floor(SAMPLE_RATE * RECORD_DUR);
+let rollingBuffer = new Float32Array(BUFFER_SIZE);
+let bufferIndex = 0;
+let scriptNode, dummyGain;
+
+// ── SINIFLAR VE PROFİLLER (İsimler modelle birebir eşleştirildi; sadece eğitilen sınıflar: Bird, People, Car) ──
+const CLASS_PROFILES = {
+  "Bird":             { type:'bird',      catKey:'C', col: [120, 220, 200], emoji: '🐦', angleIdx: 0, desc:'Natural' },  
+  "People":           { type:'human',     catKey:'R', col: [180, 50, 255],  emoji: '👥', angleIdx: 1, desc:'Social' },    
+  "Car":              { type:'car',       catKey:'D', col: [255, 80, 50],   emoji: '🚗', angleIdx: 2, desc:'Mechanical' }   
+};
+
+function initZoneStats() {
+  for (let k in CLASS_PROFILES) {
+    ZONE_STATS[k] = { totalSpawned: 0, activeCount: 0, avgConf: 0, confSum: 0, firstSeen: null, lastSeen: null, recentTimes: [] };
+  }
+}
+
+let agents = [];
+let shockwaves = [];
+let lastWaveTime = 0;
+let stressLevel = 0;
+let fVol = 0;
+let maxRadius;
+let bgL;
+let trailLayer; 
+let domProfile = null;
+
+// ============================================================
+// SİSTEM BAŞLATMA
+// ============================================================
+async function startSystem() {
+  const btn = document.getElementById('start-btn');
+  btn.style.display = 'none';
+  document.getElementById('loading-text').style.display = 'block';
+  
+  try {
+    window.AudioContext = window.AudioContext || window.webkitAudioContext;
+    audioCtx = new AudioContext({sampleRate: SAMPLE_RATE});
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+
+    recognizer = speechCommands.create("BROWSER_FFT", undefined, TM_URL + "model.json", TM_URL + "metadata.json");
+    await recognizer.ensureModelLoaded();
+    
+    let rawLabels = recognizer.wordLabels();
+    tmLabels = rawLabels.filter(l => CLASS_PROFILES[l]); 
+    initUIBars();
+
+    recognizer.listen(result => {
+        if(isSessionFinished) return; 
+        if(audioCtx.state === 'suspended') audioCtx.resume();
+
+        let maxIdx = 0, maxScore = -1;
+        for (let i = 0; i < result.scores.length; i++) {
+          let l = rawLabels[i];
+          if(CLASS_PROFILES[l]) { 
+              updateUIBar(l, result.scores[i]);
+              if(result.scores[i] > maxScore) { maxScore = result.scores[i]; maxIdx = i; }
+          }
+        }
+        
+        currentAIClass = rawLabels[maxIdx];
+        if(!CLASS_PROFILES[currentAIClass]) return; 
+        currentAIScore = maxScore;
+        
+        // Hızlı Tepki (Sıfır Gecikme): Sesi %65 güvende anında algılar
+        if (maxScore >= 0.65) {
+            applyAIEffects(currentAIClass, maxScore);
+        } else {
+            domProfile = null;
+        }
+    }, { probabilityThreshold: 0, overlapFactor: 0.5 });
+
+    navigator.mediaDevices.getUserMedia({audio:true, video:false}).then(function(stream) {
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 512;
+        freqData = new Uint8Array(analyser.frequencyBinCount);
+        
+        let micSource = audioCtx.createMediaStreamSource(stream);
+        micSource.connect(analyser);
+        
+        scriptNode = audioCtx.createScriptProcessor(4096, 1, 1);
+        micSource.connect(scriptNode);
+        
+        dummyGain = audioCtx.createGain();
+        dummyGain.gain.value = 0; 
+        scriptNode.connect(dummyGain);
+        dummyGain.connect(audioCtx.destination);
+        
+        scriptNode.onaudioprocess = function(e) {
+            if(isSessionFinished) return;
+            let inputData = e.inputBuffer.getChannelData(0);
+            for (let i = 0; i < inputData.length; i++) {
+                rollingBuffer[bufferIndex] = inputData[i];
+                bufferIndex = (bufferIndex + 1) % BUFFER_SIZE;
+            }
+        };
+        
+        micStarted = true;
+        document.getElementById('start-overlay').style.display = 'none';
+        buildPanelMeter();
+      });
+  } catch(e) {
+    alert("Error: " + e.message + "\nPlease run via Localhost / Live Server.");
+  }
+}
+
+function applyAIEffects(className, score) {
+  let prof = CLASS_PROFILES[className] || CLASS_PROFILES["Bird"];
+  domProfile = prof;
+
+  if (prof.catKey === "C") stressLevel = max(0, stressLevel - 1.0);
+  else if (prof.catKey === "D") stressLevel = min(100, stressLevel + 2.5); 
+  
+  if (millis() - lastWaveTime > 500 && fVol > 0.05) {
+    shockwaves.push({ r: 15, maxR: maxRadius, speed: map(stressLevel, 0, 100, 5, 15), col: prof.col, catKey: prof.catKey, hitAgents: new Set() });
+    lastWaveTime = millis();
+  }
+}
+
+// ============================================================
+// VEKTÖREL FİGÜRLER
+// ============================================================
+function drawBird(x,y,sz,ang,cr,cg,cb,a,ph){
+  var wf=Math.sin(ph)*sz*0.42;
+  push();translate(x,y);rotate(ang);noStroke();
+  fill(cr,cg,cb,a*0.07);circle(0,0,sz*5.5);
+  fill(cr,cg,cb,a*0.11);circle(0,0,sz*3.2);
+  fill(cr,cg,cb,a);ellipse(0,0,sz*1.55,sz*0.5);
+  fill(cr,cg,cb,a*0.9);
+  beginShape();vertex(sz*0.36,-sz*0.12);
+  bezierVertex(-sz*0.15,sz*0.08+wf,-sz*1.28,sz*0.0+wf,-sz*1.72,-sz*0.44);
+  bezierVertex(-sz*1.12,-sz*0.22,-sz*0.32,-sz*0.16,sz*0.36,-sz*0.12);
+  endShape(CLOSE);
+  fill(cr,cg,cb,a*0.86);
+  beginShape();vertex(sz*0.36,sz*0.12);
+  bezierVertex(-sz*0.15,-sz*0.08-wf,-sz*1.28,sz*0.0-wf,-sz*1.72,sz*0.44);
+  bezierVertex(-sz*1.12,sz*0.22,-sz*0.32,sz*0.16,sz*0.36,sz*0.12);
+  endShape(CLOSE);
+  fill(cr,cg,cb,a*0.7);triangle(-sz*0.78,0,-sz*1.3,-sz*0.3,-sz*1.3,sz*0.3);
+  fill(Math.min(cr+10,255),Math.min(cg+10,255),cb,a);circle(sz*0.88,-sz*0.04,sz*0.62);
+  fill(Math.min(cr+25,255),Math.floor(cg*0.72),Math.floor(cb*0.3),a);
+  triangle(sz*1.15,-sz*0.1,sz*1.5,-sz*0.2,sz*1.15,sz*0.06);
+  fill(10,8,6,a*0.85);circle(sz*0.96,-sz*0.12,sz*0.17);
+  pop();
+}
+
+function drawSeaFlower(x,y,sz,rot,cr,cg,cb,a){
+  push();translate(x,y);rotate(rot);noStroke();
+  fill(cr,cg,cb,a*0.68);
+  for(var i=0;i<8;i++){rotate(TWO_PI/8);ellipse(0,-sz*1.35,sz*0.7,sz*1.65);}
+  rotate(PI/8);fill(Math.min(cr+28,255),Math.min(cg+28,255),Math.min(cb+18,255),a*0.85);
+  for(var i=0;i<8;i++){rotate(TWO_PI/8);ellipse(0,-sz*0.8,sz*0.43,sz*0.97);}
+  fill(Math.min(cr+50,255),Math.min(cg+35,255),Math.floor(cb*0.5+35),a);circle(0,0,sz*0.85);
+  fill(250,248,235,a*0.88);circle(0,0,sz*0.42);
+  for(var i=0;i<5;i++){circle(Math.cos(i*TWO_PI/5)*sz*0.22,Math.sin(i*TWO_PI/5)*sz*0.22,sz*0.1);}
+  pop();
+}
+
+function drawDandelion(x,y,sz,rot,cr,cg,cb,a){
+  push();translate(x,y);
+  stroke(Math.floor(cr*0.7),Math.floor(cg*0.85),Math.floor(cb*0.6),a*0.58);
+  strokeWeight(sz*0.09);line(0,0,0,sz*1.6);
+  var n=13;
+  for(var i=0;i<n;i++){
+    var ang=rot+(i/n)*TWO_PI,len=sz*1.28;
+    var tx=Math.cos(ang)*len,ty=Math.sin(ang)*len;
+    stroke(cr,cg,cb,a*0.48);strokeWeight(sz*0.04);line(0,0,tx,ty);
+    noStroke();fill(Math.min(cr+25,255),Math.min(cg+20,255),Math.min(cb+16,255),a*0.82);
+    push();translate(tx,ty);rotate(ang+HALF_PI);ellipse(0,0,sz*0.21,sz*0.09);pop();
+  }
+  noStroke();fill(cr,cg,cb,a);circle(0,0,sz*0.35);
+  pop();
+}
+
+function drawHuman(x,y,sz,cr,cg,cb,a){
+  push();translate(x,y);
+  function _fig(ox,oy,sz,cr,cg,cb,a){
+    noStroke();fill(cr,cg,cb,a);circle(ox,oy-sz*1.5,sz*0.6);
+    push();rectMode(CENTER);rect(ox,oy-sz*0.68,sz*0.48,sz*0.96,sz*0.09);pop();
+    stroke(cr,cg,cb,a);strokeWeight(sz*0.16);strokeCap(ROUND);
+    line(ox-sz*0.1,oy-sz*0.18,ox-sz*0.16,oy+sz*0.52);
+    line(ox+sz*0.1,oy-sz*0.18,ox+sz*0.16,oy+sz*0.52);
+    line(ox-sz*0.22,oy-sz*0.86,ox-sz*0.5,oy-sz*0.3);
+    line(ox+sz*0.22,oy-sz*0.86,ox+sz*0.46,oy-sz*0.28);
+    noStroke();
+  }
+  _fig(-sz*0.66,0,sz,cr,cg,cb,a);
+  _fig(sz*0.66,0,sz*0.84,cr,cg,cb,a*0.78);
+  stroke(cr,cg,cb,a*0.28);strokeWeight(sz*0.055);noFill();
+  for(var i=1;i<=3;i++) arc(-sz*0.12,-sz*1.4,sz*i*0.5,sz*i*0.5,-PI*0.76,PI*0.07);
+  pop();
+}
+
+function drawCar(x,y,sz,ang,cr,cg,cb,a){
+  push();translate(x,y);rotate(ang);noStroke();
+  fill(68,55,42,a*0.2);circle(-sz*1.9,sz*0.05,sz*3.5);
+  fill(cr,cg,cb,a);push();rectMode(CENTER);rect(0,sz*0.06,sz*3.1,sz*1.22,sz*0.2);pop();
+  fill(Math.floor(cr*0.82),Math.floor(cg*0.82),Math.floor(cb*0.82),a);
+  beginShape();
+  vertex(-sz*0.64,-sz*0.61);vertex(-sz*0.18,-sz*1.42);
+  vertex(sz*0.84,-sz*1.42);vertex(sz*1.16,-sz*0.61);
+  endShape(CLOSE);
+  fill(14,16,18,a*0.62);
+  beginShape();
+  vertex(-sz*0.07,-sz*0.61);vertex(sz*0.04,-sz*1.34);
+  vertex(sz*0.78,-sz*1.34);vertex(sz*1.08,-sz*0.61);
+  endShape(CLOSE);
+  fill(16,13,11,a);circle(-sz*0.86,sz*0.72,sz*0.92);circle(sz*0.92,sz*0.72,sz*0.92);
+  fill(28,24,20,a*0.8);circle(-sz*0.86,sz*0.72,sz*0.43);circle(sz*0.92,sz*0.72,sz*0.43);
+  fill(Math.min(cr+55,255),Math.min(cg+45,255),Math.min(cb+25,255),a*0.72);
+  ellipse(sz*1.44,-sz*0.05,sz*0.22,sz*0.38);
+  fill(205,55,28,a*0.45);ellipse(-sz*1.48,sz*0.0,sz*0.17,sz*0.33);
+  pop();
+}
+
+// ============================================================
+// AGENT (Veri Noktası & Ses Hafızası)
+// ============================================================
+class Agent {
+  constructor(className, vol) {
+    let prof = CLASS_PROFILES[className] || CLASS_PROFILES["Bird"];
+    this.prof = prof; this.className = className; this.type = prof.type; this.catKey = prof.catKey; this.col = prof.col;
+    let sliceAngle = TWO_PI / 3; 
+    let baseAngle = prof.angleIdx * sliceAngle;
+    this.targetAngle = baseAngle + random(0.1, sliceAngle - 0.1);
+    this.pos = createVector(width/2, height/2);
+    this.prevPos = this.pos.copy();
+    
+    this.targetPos = createVector(width/2, height/2); 
+    this.targetRadius = random(maxRadius * 0.35, maxRadius * 0.95);
+    
+    this.baseEasing = random(0.015, 0.04); 
+    this.noiseOffsetX = random(1000); this.noiseOffsetY = random(1000);
+    this.pulse = 0; this.phase = random(TWO_PI); this.rot = random(TWO_PI);
+    
+    this.sz = lerp(5, 9, constrain(vol * 4, 0, 1));
+    this.conf = currentAIScore;
+    this.born = new Date().toLocaleTimeString();
+    this.age = 0;
+    
+    this.fftSnap = new Array(32).fill(0);
+    if(freqData && freqData.length > 0) {
+      let step = Math.floor(freqData.length/32);
+      for(let i=0; i<32; i++) this.fftSnap[i] = freqData[i*step]/255;
+    }
+    
+    this.myAudioBuffer = null;
+    if (audioCtx) {
+        this.myAudioBuffer = audioCtx.createBuffer(1, BUFFER_SIZE, SAMPLE_RATE);
+        let channel = this.myAudioBuffer.getChannelData(0);
+        for (let i = 0; i < BUFFER_SIZE; i++) {
+            channel[i] = rollingBuffer[(bufferIndex + i) % BUFFER_SIZE];
+        }
+    }
+    
+    this.alpha = 255; 
+    this.targetAlpha = random(120, 180); 
+    this.decaying = false;
+    this.forceDecay = false; 
+    this.scatterTarget = null; 
+    this.synth = null; 
+    
+    let sKey = Object.keys(CLASS_PROFILES).find(k => CLASS_PROFILES[k] === this.prof);
+    if (sKey && ZONE_STATS[sKey]) {
+      ZONE_STATS[sKey].totalSpawned++;
+      ZONE_STATS[sKey].confSum += vol;
+      ZONE_STATS[sKey].avgConf = ZONE_STATS[sKey].confSum / ZONE_STATS[sKey].totalSpawned;
+      let now = new Date().toLocaleTimeString();
+      if (!ZONE_STATS[sKey].firstSeen) ZONE_STATS[sKey].firstSeen = now;
+      ZONE_STATS[sKey].lastSeen = now;
+      ZONE_STATS[sKey].recentTimes.push(Date.now());
+      if (ZONE_STATS[sKey].recentTimes.length > 24) ZONE_STATS[sKey].recentTimes.shift();
+    }
+  }
+
+  update() {
+    this.age++;
+    this.prevPos = this.pos.copy();
+    this.pulse = max(0, this.pulse - 0.02);
+    this.phase += 0.08; this.rot += 0.005;
+
+    if (isSessionFinished) {
+       if (this !== draggedAgent && this.scatterTarget) {
+           this.pos.lerp(this.scatterTarget, 0.04);
+           this.scatterTarget.x += map(noise(this.noiseOffsetX, frameCount*0.001), 0, 1, -0.2, 0.2);
+           this.scatterTarget.y += map(noise(this.noiseOffsetY, frameCount*0.001), 0, 1, -0.2, 0.2);
+       }
+       return; 
+    }
+
+    if (this.forceDecay) {
+      this.alpha = Math.max(0, this.alpha - 8); 
+    } else {
+      if (this.alpha > this.targetAlpha) {
+         this.alpha -= 2; 
+      }
+    }
+
+    let finalTargetX, finalTargetY;
+    if (isMixing) {
+      let chaosAngle = noise(this.noiseOffsetX, frameCount * 0.01) * TWO_PI * 4;
+      let chaosRadius = noise(this.noiseOffsetY, frameCount * 0.01) * (maxRadius * 0.6);
+      finalTargetX = width/2 + cos(chaosAngle) * chaosRadius;
+      finalTargetY = height/2 + sin(chaosAngle) * chaosRadius;
+    } else {
+      finalTargetX = width/2 + cos(this.targetAngle) * this.targetRadius;
+      finalTargetY = height/2 + sin(this.targetAngle) * this.targetRadius;
+    }
+    
+    this.targetPos.set(finalTargetX, finalTargetY);
+    let desired = p5.Vector.sub(this.targetPos, this.pos);
+    
+    let repX = 0, repY = 0;
+    for (let other of agents) {
+      if (other !== this && other.className === this.className) {
+        let d = dist(this.pos.x, this.pos.y, other.pos.x, other.pos.y);
+        if (d < this.sz * 4 && d > 0) {
+          let force = (this.sz * 4 - d) * 0.08;
+          repX += ((this.pos.x - other.pos.x) / d) * force;
+          repY += ((this.pos.y - other.pos.y) / d) * force;
+        }
+      }
+    }
+    
+    let jitter = map(trebleVol, 0, 0.3, 0, 3);
+    let nX = map(noise(this.noiseOffsetX, frameCount * 0.005), 0, 1, -1, 1);
+    let nY = map(noise(this.noiseOffsetY, frameCount * 0.005), 0, 1, -1, 1);
+    
+    let currentEasing = isMixing ? this.baseEasing * 2 : this.baseEasing;
+    this.pos.x += desired.x * currentEasing + nX + repX + random(-jitter, jitter);
+    this.pos.y += desired.y * currentEasing + nY + repY + random(-jitter, jitter);
+  }
+
+  drawTrace(layer) {
+    if (this.alpha <= 0) return;
+    layer.push();
+    layer.blendMode(SCREEN); 
+    let linkDist = isMixing ? 150 : 80;
+
+    for (let other of agents) {
+      if (other !== this && (other.catKey === this.catKey || isMixing)) {
+        let d = dist(this.pos.x, this.pos.y, other.pos.x, other.pos.y);
+        if (d < linkDist) { 
+          let connectionAlpha = map(d, 0, linkDist, 2, 0) * map(this.alpha, 0, 255, 0, 1); 
+          layer.stroke(this.col[0], this.col[1], this.col[2], connectionAlpha);
+          layer.strokeWeight(0.5); 
+          layer.line(this.pos.x, this.pos.y, other.pos.x, other.pos.y);
+          layer.strokeWeight(1.2); 
+          layer.stroke(this.col[0], this.col[1], this.col[2], connectionAlpha * 0.7);
+          layer.line(this.pos.x, this.pos.y, other.pos.x, other.pos.y);
+        }
+      }
+    }
+    layer.stroke(this.col[0], this.col[1], this.col[2], 1.5);
+    layer.strokeWeight(0.2);
+    layer.line(this.pos.x, this.pos.y, width/2, height/2);
+    layer.pop();
+  }
+
+  display(alphaMultiplier = 1) {
+    if (isSessionFinished) {
+       let ang = this.rot; 
+       let la = 255; 
+       
+       if (this === draggedAgent) {
+           ang = atan2(mouseY - this.prevPos.y, mouseX - this.prevPos.x);
+       }
+
+       if (this.type === 'bird')       drawBird(this.pos.x, this.pos.y, this.sz*1.2, ang, this.col[0], this.col[1], this.col[2], la, this.phase);
+       else if (this.type === 'seaflower') drawSeaFlower(this.pos.x, this.pos.y, this.sz*1.2, this.rot, this.col[0], this.col[1], this.col[2], la);
+       else if (this.type === 'leaf')      drawDandelion(this.pos.x, this.pos.y, this.sz*1.2, this.rot, this.col[0], this.col[1], this.col[2], la);
+       else if (this.type === 'human')     drawHuman(this.pos.x, this.pos.y, this.sz*1.2, this.col[0], this.col[1], this.col[2], la);
+       else if (this.type === 'car')       drawCar(this.pos.x, this.pos.y, this.sz*1.2, ang, this.col[0], this.col[1], this.col[2], la);
+       
+       if (this === draggedAgent) {
+           noFill(); stroke(this.col[0], this.col[1], this.col[2], 200); strokeWeight(2); circle(this.pos.x, this.pos.y, this.sz * 4);
+       } else if (this.synth) {
+           noFill(); stroke(30, 30, 35, 100); strokeWeight(1);
+           circle(this.pos.x, this.pos.y, this.sz * 2.5 + sin(frameCount * 0.05) * 2);
+       }
+       return;
+    }
+
+    if (this.alpha <= 0) return;
+    let trebleBoost = map(trebleVol, 0, 0.3, 1, 1.5);
+    let la = this.alpha * (1 + this.pulse) * trebleBoost * alphaMultiplier;
+    if (la < 4) return;
+    
+    let ang = atan2(this.targetPos.y - this.pos.y, this.targetPos.x - this.pos.x);
+
+    if (this.type === 'bird')       drawBird(this.pos.x, this.pos.y, this.sz, ang, this.col[0], this.col[1], this.col[2], la, this.phase);
+    else if (this.type === 'seaflower') drawSeaFlower(this.pos.x, this.pos.y, this.sz, this.rot, this.col[0], this.col[1], this.col[2], la);
+    else if (this.type === 'leaf')      drawDandelion(this.pos.x, this.pos.y, this.sz, this.rot, this.col[0], this.col[1], this.col[2], la);
+    else if (this.type === 'human')     drawHuman(this.pos.x, this.pos.y, this.sz, this.col[0], this.col[1], this.col[2], la);
+    else if (this.type === 'car')       drawCar(this.pos.x, this.pos.y, this.sz, ang, this.col[0], this.col[1], this.col[2], la);
+    
+    if (this.pulse > 0.05 && !isSessionFinished) {
+        noFill(); stroke(255, 255, 255, this.pulse * 150 * alphaMultiplier); strokeWeight(map(this.pulse, 0, 1, 0.5, 2)); circle(this.pos.x, this.pos.y, this.sz * 4);
+    }
+  }
+}
+
+// ============================================================
+// SES SENTEZİ VE KAYDEDİLEN SESİN ÇALINMASI
+// ============================================================
+function updateHarmonyVolume() {
+   let activeAgents = agents.filter(a => a.synth);
+   let count = activeAgents.length;
+   if(count === 0) return;
+   
+   let safeVol = 0.8 / Math.max(1, Math.sqrt(count)); 
+   for(let a of activeAgents) {
+       if(a !== draggedAgent) {
+           a.synth.gain.gain.setTargetAtTime(safeVol, audioCtx.currentTime, 0.5);
+       }
+   }
+}
+
+function playAgentSound(a) {
+   if(!audioCtx || !a.myAudioBuffer) return;
+   
+   if(audioCtx.state === 'suspended') audioCtx.resume();
+   
+   if(harmonyMasterGain) {
+       harmonyMasterGain.gain.setTargetAtTime(0.15, audioCtx.currentTime, 0.1);
+   }
+   
+   if(!a.synth) {
+       let source = audioCtx.createBufferSource();
+       source.buffer = a.myAudioBuffer;
+       source.loop = true;
+       
+       let gain = audioCtx.createGain();
+       let filter = audioCtx.createBiquadFilter();
+       
+       source.connect(filter);
+       filter.connect(gain);
+       gain.connect(harmonyMasterGain);
+       
+       filter.type = 'lowpass';
+       filter.Q.value = 1.0;
+       
+       source.start();
+       a.synth = {source, gain, filter};
+   }
+   
+   a.synth.gain.gain.setTargetAtTime(1.0, audioCtx.currentTime, 0.1);
+   updateAgentSound(a);
+}
+
+function updateAgentSound(a) {
+   if(!a.synth) return;
+   let pitchX = map(a.pos.x, 0, width, 0.8, 1.5); 
+   let filterY = map(a.pos.y, 0, height, 8000, 500); 
+   a.synth.source.playbackRate.setTargetAtTime(pitchX, audioCtx.currentTime, 0.05);
+   a.synth.filter.frequency.setTargetAtTime(filterY, audioCtx.currentTime, 0.05);
+}
+
+function stopAgentSound(a) {
+   if(!a || !a.synth) return;
+   updateHarmonyVolume(); 
+   if(harmonyMasterGain) {
+       harmonyMasterGain.gain.setTargetAtTime(1.0, audioCtx.currentTime, 0.5);
+   }
+}
+
+// ============================================================
+// P5.JS YAŞAM DÖNGÜSÜ
+// ============================================================
+function setup() {
+  let canvas = createCanvas(windowWidth, windowHeight);
+  canvas.id('mainCanvas');
+  angleMode(RADIANS);
+  maxRadius = min(width, height) * 0.40;
+
+  bgL = createGraphics(width, height);
+  bgL.background(5, 7, 10);
+  
+  trailLayer = createGraphics(width, height);
+  trailLayer.background(245, 242, 235, 0); 
+  
+  initZoneStats();
+}
+
+function analyzeFrequencies() {
+  let third = Math.floor(freqData.length / 3);
+  if (third === 0) third = 1; 
+  let bSum = 0, mSum = 0, tSum = 0;
+  for(let i=0; i<third; i++) bSum += freqData[i];
+  for(let i=third; i<third*2; i++) mSum += freqData[i];
+  for(let i=third*2; i<freqData.length; i++) tSum += freqData[i];
+  
+  let rem = freqData.length - third*2;
+  bassVol = (bSum / third) / 255 || 0;
+  midVol = (mSum / third) / 255 || 0;
+  trebleVol = (tSum / rem) / 255 || 0;
+  
+  fVol = (bSum + mSum + tSum) / freqData.length / 255 || 0;
+}
+
+function drawHoverTooltip(a) {
+  let tw = 165, th = 88;
+  let tx = a.pos.x + a.sz * 2.5 + 8;
+  let ty = a.pos.y - 44;
+  if (tx + tw > width - 20) tx = a.pos.x - tw - a.sz * 2.5 - 8;
+  if (ty + th > height - 55) ty = height - 55 - th;
+  if (ty < 8) ty = 8;
+  
+  push();
+  fill(4, 6, 10, 228); noStroke();
+  rectMode(CORNER);
+  rect(tx, ty, tw, th, 2);
+  
+  fill(a.col[0], a.col[1], a.col[2], 120); noStroke();
+  rect(tx, ty, 2, th, 1);
+  
+  textFont('Space Mono'); textSize(8.5); textAlign(LEFT, TOP);
+  fill(185, 180, 165);
+  text('[' + a.type.toUpperCase() + '] ' + a.prof.emoji + '\n' +
+       a.catKey + ' · ' + a.prof.desc + '\n' +
+       'CONF ' + nf(a.conf, 1, 2) + '   ' + a.born + '\n' +
+       'AGE ' + a.age + 'f', tx + 8, ty + 7);
+       
+  let sbx = tx + 8, sby = ty + 68, sbW = tw - 16, sbH = 16;
+  fill(16, 18, 22, 180); noStroke(); 
+  rect(sbx, sby - sbH/2 + 8, sbW, sbH, 1);
+  for (let i = 0; i < a.fftSnap.length; i++) {
+    let bh = a.fftSnap[i] * sbH;
+    let bx = sbx + i * (sbW / a.fftSnap.length);
+    fill(a.col[0], a.col[1], a.col[2], 100 + a.fftSnap[i] * 100);
+    noStroke(); 
+    rect(bx + 1, sby + 8 - bh, sbW / a.fftSnap.length - 1, bh, 0);
+  }
+  pop();
+}
+
+function drawInteractiveNetwork() {
+   blendMode(MULTIPLY); 
+   for(let i=0; i<agents.length; i++) {
+      let a = agents[i];
+      for(let j=i+1; j<agents.length; j++) {
+         let b = agents[j];
+         let d = dist(a.pos.x, a.pos.y, b.pos.x, b.pos.y);
+         if (d < 120) {
+             strokeWeight(map(d, 0, 120, 0.8, 0.05));
+             stroke(40, 40, 45, map(d, 0, 120, 150, 0)); 
+             line(a.pos.x, a.pos.y, b.pos.x, b.pos.y);
+         }
+      }
+   }
+   blendMode(BLEND);
+}
+
+function draw() {
+  if (!micStarted) return;
+  
+  if(!isSessionFinished) {
+      analyser.getByteFrequencyData(freqData);
+      analyzeFrequencies(); 
+  }
+
+  let applyGlitch = (stressLevel > 50) && !isSessionFinished;
+  if (applyGlitch) {
+    let shakeIntensity = map(stressLevel, 50, 100, 0.5, 2.5);
+    translate(random(-shakeIntensity, shakeIntensity), random(-shakeIntensity, shakeIntensity)); 
+  }
+
+  if (!isSessionFinished) {
+      background(5,7,10);
+      bgL.blendMode(BLEND); 
+      bgL.noStroke();
+      
+      for (let k in CLASS_PROFILES) {
+          let classAgents = agents.filter(a => a.className === k && !a.forceDecay);
+          if (classAgents.length > MAX_PER_CLASS) {
+              classAgents.sort((a, b) => b.age - a.age); 
+              let excess = classAgents.length - MAX_PER_CLASS;
+              for(let i=0; i<excess; i++) {
+                  classAgents[i].forceDecay = true;
+              }
+          }
+      }
+
+      if (!isMixing) {
+        bgL.fill(5, 7, 10, map(stressLevel, 0, 100, 1.0, 3.0)); 
+        bgL.rect(0, 0, width, height);
+      }
+      for (let i = agents.length - 1; i >= 0; i--) {
+        agents[i].drawTrace(bgL); 
+      }
+      
+      if (applyGlitch) {
+        blendMode(SCREEN);
+        let offset = map(stressLevel, 50, 100, 1, 4);
+        tint(255, 0, 0, 40); image(bgL, offset, 0); 
+        tint(0, 255, 255, 40); image(bgL, -offset, 0); 
+        noTint();
+        blendMode(BLEND);
+      } else {
+        image(bgL, 0, 0);
+      }
+      if (!isMixing) drawRadialAxes();
+      
+      blendMode(ADD); 
+      push();
+      translate(width/2, height/2);
+      let coreCol = domProfile ? domProfile.col : [100,100,100];
+      let bloomSize = map(bassVol, 0, 0.3, 30, 300); 
+      
+      noStroke();
+      for (let i = 4; i > 0; i--) {
+        fill(coreCol[0], coreCol[1], coreCol[2], map(i, 4, 0, 0, 20));
+        circle(0, 0, bloomSize * (i / 4));
+      }
+      fill(coreCol[0], coreCol[1], coreCol[2], 100);
+      circle(0, 0, 15 + bassVol*50);
+      fill(255); circle(0,0,5);
+      pop();
+
+      for (let i = shockwaves.length - 1; i >= 0; i--) {
+        let sw = shockwaves[i];
+        let alpha = map(sw.r, 10, sw.maxR, 200, 0);
+        noFill(); stroke(sw.col[0], sw.col[1], sw.col[2], alpha); strokeWeight(map(alpha, 200, 0, 3, 0.5));
+        circle(width/2, height/2, sw.r * 2);
+
+        for (let agent of agents) {
+          if (agent.catKey === sw.catKey && !sw.hitAgents.has(agent)) {
+            let d = dist(width/2, height/2, agent.pos.x, agent.pos.y);
+            if (abs(d - sw.r) < 15) { agent.pulse = 1.0; sw.hitAgents.add(agent); }
+          }
+        }
+        sw.r += sw.speed;
+        if (sw.r > sw.maxR) shockwaves.splice(i, 1);
+      }
+  } else {
+      background(0, 0, 0);
+      
+      trailLayer.blendMode(BLEND);
+      trailLayer.noStroke();
+      trailLayer.fill(5, 5, 5, 1); 
+      trailLayer.rect(0,0,width,height);
+      
+      image(trailLayer, 0, 0);
+      drawInteractiveNetwork();
+  }
+
+  blendMode(BLEND); 
+  let hoveredAgent = null;
+  
+  for (let i = agents.length - 1; i >= 0; i--) {
+    let a = agents[i];
+    a.update();
+    
+    let am = 1;
+    if (focusedZoneIdx !== null && !isSessionFinished) {
+      am = (a.prof.angleIdx === focusedZoneIdx) ? 1.25 : 0.16;
+    }
+    a.display(am);
+    
+    if (dist(mouseX, mouseY, a.pos.x, a.pos.y) < a.sz * 2.6) {
+      hoveredAgent = a;
+    }
+    
+    if(!isSessionFinished && a.alpha <= 0){
+      agents.splice(i,1); 
+    }
+  }
+  
+  if (hoveredAgent && !isSessionFinished) drawHoverTooltip(hoveredAgent);
+
+  // SADECE "People", "Bird" ve "Car" İÇİN SPAWN MANTIĞI (eğitilen tüm sınıflar)
+  if (!isSessionFinished && fVol > 0.01 && domProfile) {
+    if (currentAIClass === "People" || currentAIClass === "Bird" || currentAIClass === "Car") {
+        let activeClassCount = agents.filter(a => a.className === currentAIClass && !a.forceDecay).length;
+        if (activeClassCount < MAX_PER_CLASS && random() < fVol * 1.5) {
+            agents.push(new Agent(currentAIClass, fVol));
+        }
+    }
+  }
+
+  if(!isSessionFinished) {
+      updateOracleData();
+      if(focusedZoneIdx !== null && frameCount % 30 === 0) updateZonePanel(focusedZoneIdx);
+  }
+}
+
+function drawRadialAxes() {
+  push(); translate(width/2, height/2); let sliceAngle = TWO_PI / 3; 
+  noFill(); 
+  stroke(255, 255, 255, 45); strokeWeight(1.2); circle(0, 0, maxRadius * 2);
+  let profs = Object.values(CLASS_PROFILES);
+  for (let i = 0; i < profs.length; i++) {
+    let p = profs[i]; let angle = p.angleIdx * sliceAngle + (sliceAngle / 2);
+    let catName = Object.keys(CLASS_PROFILES).find(key => CLASS_PROFILES[key] === p);
+
+    let isFocused = focusedZoneIdx === p.angleIdx;
+    let isCurrentAI = (catName === currentAIClass && domProfile !== null); // Aktif dinlenen class
+
+    let baseAlpha = focusedZoneIdx !== null ? (isFocused ? 255 : 40) : (isCurrentAI ? 255 : 180);
+    let lineAlpha = focusedZoneIdx !== null ? (isFocused ? 60 : 10) : (isCurrentAI ? 60 : 20);
+
+    stroke(p.col[0], p.col[1], p.col[2], lineAlpha); strokeWeight(isFocused || isCurrentAI ? 1.5 : 1); drawingContext.setLineDash([2, 4]);
+    line(0, 0, cos(angle) * maxRadius, sin(angle) * maxRadius); drawingContext.setLineDash([]);
+    
+    // Aktif ses sınıfı için radyal dilimde hafif ışık yanma efekti
+    if(isFocused || isCurrentAI){
+      let glowAlpha = isFocused ? 50 : (currentAIScore * 35); // AI skoruyla orantılı parlama
+      noFill();stroke(p.col[0],p.col[1],p.col[2],glowAlpha);strokeWeight(maxRadius*0.08);
+      arc(0,0,(maxRadius-maxRadius*0.04)*2,(maxRadius-maxRadius*0.04)*2,p.angleIdx*sliceAngle,(p.angleIdx+1)*sliceAngle);
+    }
+
+    let labelR = maxRadius + 30; let lx = cos(angle) * labelR; let ly = sin(angle) * labelR;
+    push(); translate(lx, ly); rotate(angle);
+    if (angle > PI / 2 && angle < 3 * PI / 2) { rotate(PI); textAlign(RIGHT, CENTER); } else { textAlign(LEFT, CENTER); }
+    
+    noStroke(); fill(p.col[0], p.col[1], p.col[2], baseAlpha); textFont('Space Mono'); textSize(10); text(catName.toUpperCase(), 0, -6);
+    fill(120, 130, 150, baseAlpha * (120/180)); textFont('Josefin Sans'); textSize(8); text(p.desc.toUpperCase(), 0, 6);
+    pop();
+  }
+  pop();
+}
+
+// ============================================================
+// ETKİLEŞİM & ARAYÜZ
+// ============================================================
+function finishSession() {
+  isSessionFinished = true;
+  saveCanvas('Acoustic_Memory_Matrix_Final', 'jpg'); 
+  
+  if(oracleOpen) toggleOracle();
+  document.getElementById('oracle-toggle').style.display = 'none';
+  let zp = document.getElementById('zone-panel');
+  if(zp) zp.classList.remove('visible');
+  
+  bgL.clear();
+  trailLayer.clear();
+  trailLayer.background(245, 242, 235, 0);
+  
+  if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  harmonyMasterGain = audioCtx.createGain();
+  harmonyMasterGain.gain.value = 1.0;
+  harmonyMasterGain.connect(audioCtx.destination);
+  
+  for(let a of agents) {
+      a.scatterTarget = createVector(random(width*0.1, width*0.9), random(height*0.1, height*0.9));
+  }
+}
+
+function mousePressed() {
+  if (isSessionFinished) {
+    for (let i = agents.length - 1; i >= 0; i--) {
+      let a = agents[i];
+      if (dist(mouseX, mouseY, a.pos.x, a.pos.y) < a.sz * 4) {
+        draggedAgent = a;
+        playAgentSound(draggedAgent);
+        break;
+      }
+    }
+    return;
+  }
+
+  if (mouseY > height - 50) return; 
+  let dx = mouseX - width / 2, dy = mouseY - height / 2;
+  let dc = sqrt(dx * dx + dy * dy);
+  if (dc > maxRadius * 0.08 && dc < maxRadius * 1.25) {
+    let ang = atan2(dy, dx);
+    if (ang < 0) ang += TWO_PI;
+    let sliceAngle = TWO_PI / 3;
+    let zoneIdx = Math.floor(ang / sliceAngle);
+    if (focusedZoneIdx === zoneIdx) {
+      exitFocus();
+    } else {
+      focusedZoneIdx = zoneIdx;
+      document.getElementById('zone-panel').classList.add('visible');
+      updateZonePanel(zoneIdx);
+    }
+    return;
+  }
+  exitFocus();
+}
+
+function mouseDragged() {
+  if (isSessionFinished && draggedAgent) {
+    let d = dist(pmouseX, pmouseY, mouseX, mouseY);
+    let steps = max(1, floor(d / 4)); 
+    
+    let ctx = trailLayer.drawingContext;
+    trailLayer.blendMode(BLEND); 
+    
+    for (let i = 0; i <= steps; i++) {
+      let t = i / steps;
+      let xx = lerp(pmouseX, mouseX, t);
+      let yy = lerp(pmouseY, mouseY, t);
+      
+      let r = draggedAgent.col[0];
+      let g = draggedAgent.col[1];
+      let b = draggedAgent.col[2];
+      let radius = draggedAgent.sz * 10; 
+      
+      let grad = ctx.createRadialGradient(xx, yy, 0, xx, yy, radius);
+      grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.15)`);
+      grad.addColorStop(0.4, `rgba(${r}, ${g}, ${b}, 0.05)`);
+      grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(xx, yy, radius, 0, TWO_PI);
+      ctx.fill();
+      
+      trailLayer.noStroke();
+      trailLayer.fill(r * 0.9, g * 0.9, b * 0.9, 180); 
+      for(let k=0; k<25; k++) {
+         let angle = random(TWO_PI);
+         let rad = random() * radius;
+         trailLayer.circle(xx + cos(angle)*rad, yy + sin(angle)*rad, random(0.5, 2.5));
+      }
+      
+      trailLayer.fill(30, 30, 35, 200);
+      for(let k=0; k<3; k++) {
+         let angle = random(TWO_PI);
+         let rad = random() * radius * 1.2;
+         trailLayer.circle(xx + cos(angle)*rad, yy + sin(angle)*rad, random(1, 3.5));
+      }
+    }
+
+    draggedAgent.pos.x = mouseX;
+    draggedAgent.pos.y = mouseY;
+    draggedAgent.scatterTarget.x = mouseX;
+    draggedAgent.scatterTarget.y = mouseY;
+
+    updateAgentSound(draggedAgent);
+  }
+}
+
+function mouseReleased() {
+  if (draggedAgent) {
+    stopAgentSound(draggedAgent);
+    draggedAgent = null;
+  }
+}
+
+function exitFocus() {
+  focusedZoneIdx = null;
+  let zp = document.getElementById('zone-panel');
+  if(zp) zp.classList.remove('visible');
+}
+
+function updateZonePanel(zoneIdx) {
+  let prof = null;
+  for (let k in CLASS_PROFILES) {
+    if (CLASS_PROFILES[k].angleIdx === zoneIdx) { prof = CLASS_PROFILES[k]; break; }
+  }
+  if (!prof) return;
+  let sKey = Object.keys(CLASS_PROFILES).find(k => CLASS_PROFILES[k].angleIdx === zoneIdx);
+  let zs = ZONE_STATS[sKey];
+  let activeCount = agents.filter(a => a.prof.angleIdx === zoneIdx).length;
+  let colorStr = `rgb(${prof.col[0]},${prof.col[1]},${prof.col[2]})`;
+  
+  document.getElementById('zp-title').textContent = prof.emoji + ' ' + prof.type.toUpperCase();
+  document.getElementById('zp-title').style.color = colorStr;
+  document.getElementById('zp-count').textContent = activeCount;
+  document.getElementById('zp-count').style.color = colorStr;
+  
+  if (zs) {
+    document.getElementById('zp-conf').textContent = zs.totalSpawned > 0 ? nf(zs.avgConf, 1, 2) : '—';
+    document.getElementById('zp-first').textContent = zs.firstSeen || '—';
+    document.getElementById('zp-last').textContent = zs.lastSeen || '—';
+    let barPct = Math.min(100, zs.totalSpawned * 8) + '%';
+    document.getElementById('zp-bar').style.width = barPct;
+    document.getElementById('zp-bar').style.background = colorStr;
+    let tl = document.getElementById('zp-timeline');
+    tl.innerHTML = '';
+    let now = Date.now();
+    for (let i = 0; i < zs.recentTimes.length; i++) {
+      let age = now - zs.recentTimes[i];
+      let opac = Math.max(0.15, 1 - age / 120000);
+      let dot = document.createElement('div');
+      dot.className = 'zp-dot';
+      dot.style.background = colorStr;
+      dot.style.opacity = opac;
+      tl.appendChild(dot);
+    }
+  }
+}
+
+function keyPressed() {
+  if (key === 's' || key === 'S' || key === ' ') {
+    takeSnapshot();
+  }
+  if (key === 'Escape') {
+    exitFocus();
+  }
+}
+
+function takeSnapshot() {
+  let canvas = document.getElementById('mainCanvas');
+  let dataUrl = canvas.toDataURL("image/jpeg", 0.5); 
+  
+  let item = document.createElement('div');
+  item.className = 'snap-item';
+  let img = document.createElement('img');
+  img.src = dataUrl;
+  let timeStr = new Date().toLocaleTimeString();
+  let timeStamp = document.createElement('div');
+  timeStamp.className = 'snap-time';
+  timeStamp.innerText = timeStr;
+  item.appendChild(img);
+  item.appendChild(timeStamp);
+  
+  let gallery = document.getElementById('archive-gallery');
+  gallery.insertBefore(item, gallery.firstChild); 
+  
+  if(!oracleOpen) toggleOracle();
+}
+
+function toggleMixMode() {
+  isMixing = !isMixing;
+  let btn = document.querySelector('.btn-mix');
+  if (isMixing) {
+    btn.innerText = "STOP MIX";
+    btn.style.background = "rgba(200,168,64,0.2)";
+  } else {
+    btn.innerText = "MIX SYSTEM";
+    btn.style.background = "none";
+  }
+}
+
+function initUIBars() {
+  const container = document.getElementById('cls-result'); 
+  container.innerHTML = '';
+  
+  Object.keys(CLASS_PROFILES).forEach((label) => {
+    let p = CLASS_PROFILES[label];
+    let colorStr = `rgb(${p.col[0]},${p.col[1]},${p.col[2]})`;
+    
+    let isActiveInModel = tmLabels.includes(label);
+    let opacity = isActiveInModel ? "1" : "0.4"; 
+
+    container.innerHTML += `<div class="cls-card" id="cls-card-${label.replace(/\s+/g, '-')}">
+      <div class="cls-name" style="opacity:${opacity}">
+        <span>${p.emoji} <strong style="color:#e4e7eb;font-weight:400;font-family:'Space Mono'">${label}</strong></span>
+        <span id="cls-val-${label.replace(/\s+/g, '-')}" style="font-family:monospace">0%</span>
+      </div>
+      <div class="cls-bar-wrap" style="opacity:${opacity}">
+        <div id="cls-bar-${label.replace(/\s+/g, '-')}" class="cls-bar" style="width:0%; background:${colorStr}"></div>
+      </div>
+    </div>`;
+  });
+}
+
+function updateUIBar(label, score) {
+  let safeLabel = label.replace(/\s+/g, '-');
+  const bar = document.getElementById(`cls-bar-${safeLabel}`); const val = document.getElementById(`cls-val-${safeLabel}`);
+  if(bar && val) { let pct = Math.round(score * 100); bar.style.width = pct + '%'; val.innerText = pct + '%'; }
+}
+function toggleOracle() {
+  oracleOpen = !oracleOpen; document.getElementById('oracle').classList.toggle('hidden', !oracleOpen);
+  var tog = document.getElementById('oracle-toggle'); tog.classList.toggle('shifted', oracleOpen);
+  tog.textContent = oracleOpen ? 'CLOSE' : 'ORACLE INTERFACE';
+}
+function buildPanelMeter() {
+  var m = document.getElementById('panel-meter'); for(var i=0;i<40;i++){ var b = document.createElement('div'); b.className = 'meter-bar'; m.appendChild(b); }
+  setInterval(updatePanelMeter, 80);
+}
+function updatePanelMeter() {
+  if (!analyser) return; var bars = document.querySelectorAll('.meter-bar'); var step = Math.floor(freqData.length / bars.length);
+  bars.forEach(function(bar, i) {
+    var val = freqData[i * step] / 255; bar.style.height = Math.max(2, val * 40) + 'px';
+    let r = map(stressLevel, 0, 100, 140, 230); let g = map(stressLevel, 0, 100, 200, 70); let b = map(stressLevel, 0, 100, 120, 60);
+    bar.style.background = `rgba(${r},${g},${b}, 0.8)`;
+  });
+}
+function updateOracleData() {
+  let p = domProfile; let catDesc = p ? p.desc : '—';
+  let curLabel = p ? currentAIClass : '—';
+  let curScore = p ? Math.round(currentAIScore*100) : 0;
+  
+  document.getElementById('panel-meter-val').textContent = `VOL: %${(fVol*100).toFixed(1)} | STRESS: %${stressLevel.toFixed(0)}`;
+  document.getElementById('panel-state').innerHTML = `<span>AI PREDICTION:</span> ${p?p.emoji:''} ${curLabel} (%${curScore})<br><span>CATEGORY:</span> ${catDesc}<br><span>ACTIVE AGENTS:</span> ${agents.length}<br><span>MODE:</span> <strong style="color:${isMixing?'#c8a840':'#8a92a6'}">${isMixing ? 'CHAOS (MIX)' : 'RADIAL LAYOUT'}</strong>`;
+}
+function clearMemory() { agents = []; shockwaves = []; bgL.background(5, 7, 10); stressLevel = 0; document.getElementById('archive-gallery').innerHTML = ''; initZoneStats(); exitFocus(); }
+function windowResized(){ resizeCanvas(windowWidth, windowHeight); maxRadius = min(width, height) * 0.40; let oldBg = bgL; bgL = createGraphics(width, height); bgL.background(5, 7, 10); bgL.image(oldBg, 0, 0); trailLayer = createGraphics(width, height); }
+</script>
+</body>
+</html>
